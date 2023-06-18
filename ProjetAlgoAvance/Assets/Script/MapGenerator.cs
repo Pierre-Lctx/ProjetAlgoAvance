@@ -1,372 +1,370 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Net.NetworkInformation;
-using System.Runtime.CompilerServices;
+using System.Diagnostics;
+using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
-using System.Threading;
 
 public class MapGenerator : MonoBehaviour
 {
-    [Range(1, 100), Header("Parameters")]
+    [Header("GameObjects"), Space]
+    public Camera cam;
+    public GameObject pointPrefab;
+    public List<Points> pointsOnMap = new List<Points>();
+    public List<GameObject> gameObjectsOnMap = new List<GameObject>();
+
+    public List<GameObject> roadsGameObject = new List<GameObject>();
+    public List<Roads> roadsList = new List<Roads>();
+
+    public RecuitSimule recuitSimule;
+
+    public List<Trucks> trucksLists;
+
+    public GameObject truckPrefab;
+    public List<GameObject> trucks = new List<GameObject>();
+
+    public List<GameObject> trucksObjects;
+    public GameObject truckGameObjectPrefab;
+
+    [Header("Inputs"), Space]
+    public TMP_Text mapSizeText;
+    public TMP_Text numberOfPointsText;
+
+    [Header("Texts"), Space]
+
+    public TMP_Text PointsGenerationText;
+    public TMP_Text TourneeGenerationText;
+    public TMP_Text RecuitSimuleText;
+
+    [Header("Parameters"), Space]
     public int mapSize;
-    public List<GameObject> gameObjectsPoints;
-    public List<Points> points = new List<Points>();
-    public List<Points> pointsOrdered = new List<Points>();
-    [Range(1, 22)]
-    public int numberOfRoads = 1;
-    int lastNumberOfRoads = 1;
+    public int numberOfPoints;
 
-    bool roadsGenerated = false;
+    public Points OriginPoint;
 
-    List<Points> shortestPath = new List<Points>();
-    List<GameObject> paths = new List<GameObject>();
+    public float timeOfAction;
 
-    [Header("Roads - Color")]
+    public int numberOftrucks;
 
-    public List<GameObject> GreenRoads;
-    public List<GameObject> BlueRoads;
-    public List<GameObject> RedRoads;
-    public List<GameObject> BlackRoads;
+    public float vMoyen;
+    public float vBouchon;
 
-    bool greenIsDisplay = true;
-    bool blueIsDisplay = true;
-    bool redIsDisplay = true;
-    bool blackIsDisplay = true;
-
-    List<Roads> Roads = new List<Roads>();
-
-    Points startPoint;
-    Points endPoint;
-
-    // Start is called before the first frame update
-    void Start()
+    public void GeneratePointsOnMap()
     {
-        //GenerateMap();
-        GenerateExistingPoints();
-    }
+        Stopwatch stopwatch = new Stopwatch();
+        stopwatch.Start();
+        ResetMap();
 
-    private void Update()
-    {
-        if (lastNumberOfRoads != numberOfRoads)
+        for (int i = 0; i < numberOfPoints; i++)
         {
-            Debug.Log("Change");
-            lastNumberOfRoads = numberOfRoads;
-            roadsGenerated = false;
-            ClearMap();
-        }
-        if (roadsGenerated == false)
-        {
-            GenerateRoads();
-            FindShortestWay();
-            //StartCoroutine(GenerateShortestPathWithDelay());
-        }
-    }
+            GameObject gameObject = Instantiate(pointPrefab, new Vector3(Random.Range(-mapSize, mapSize), 0, Random.Range(-mapSize, mapSize)), Quaternion.identity);
 
-    void GenerateMap()
-    {
-        int numberOfPoint = 1;
-        for (int i = 0; i < mapSize; i++)
-        {
-            Vector3 co = new Vector3(Random.Range(-25, 25), 0, Random.Range(-25, 25));
+            gameObject.name = $"Point {i + 1}";
 
-            Points pointToAdd = new Points();
+            gameObject.transform.localScale = new Vector3(mapSize * .01f, mapSize * .01f, mapSize * .01f);
 
-            pointToAdd.position = co;
-            pointToAdd.gameObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Points point = new Points();
+
+            point.gameObject = gameObject;
+            point.transform = gameObject.transform;
+            point.id = i;
 
             if (i == 0)
             {
-                pointToAdd.gameObject.name = "Start Point";
-                Renderer renderer = pointToAdd.gameObject.GetComponent<Renderer>();
-                renderer.material.color = Color.green;
-
-                pointToAdd.gameObject.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
-            }
-            else if (i == mapSize- 1)
-            {
-                pointToAdd.gameObject.name = "End point";
-                Renderer renderer = pointToAdd.gameObject.GetComponent<Renderer>();
-                renderer.material.color = Color.red;
-
-                pointToAdd.gameObject.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+                point.isStartAndEnd = true;
+                OriginPoint = point;
             }
             else
             {
-                pointToAdd.gameObject.name = "Point " + numberOfPoint;
+                point.isStartAndEnd = false;
             }
 
-            pointToAdd.gameObject.transform.position = co;
-            points.Add(pointToAdd);
-
-            numberOfPoint++;
+            pointsOnMap.Add(point);
+            gameObjectsOnMap.Add(gameObject);
         }
+
+        stopwatch.Stop();
+        double duration = stopwatch.Elapsed.TotalSeconds;
+
+        PointsGenerationText.text = "Points generation duration : " + duration + " sec";
     }
 
-    private void GenerateShortestPaths()
+    public void ResetMap()
     {
-        float distance = 0;
-
-        List<Points> unvisitedTown = new List<Points>(points);
-        unvisitedTown.Remove(startPoint);
-
-
-    }
-
-    public void GenerateExistingPoints()
-    {
-        foreach(GameObject gameObject in gameObjectsPoints)
+        foreach (GameObject gameObject in gameObjectsOnMap)
         {
-            Points newPoint = new Points();
-
-            newPoint.gameObject = gameObject;
-            newPoint.position = gameObject.transform.position;
-
-            newPoint.Name = gameObject.name;
-            if (newPoint.Name == "Rouen")
-            {
-                newPoint.IsStart = true;
-
-                Renderer cubeRenderer = gameObject.GetComponent<Renderer>();
-                cubeRenderer.material.color = Color.green;
-            }
-            else if (newPoint.Name == "Bordeaux")
-            {
-                newPoint.IsEnd = true;
-
-                Renderer cubeRenderer = gameObject.GetComponent<Renderer>();
-                cubeRenderer.material.color = Color.red;
-            }
-
-            points.Add(newPoint);
+            Destroy(gameObject);
         }
+
+        foreach (GameObject gameObject in roadsGameObject)
+        {
+            Destroy(gameObject);
+        }
+
+        pointsOnMap.Clear();
+        roadsList.Clear();
+
+        gameObjectsOnMap.Clear();
+        roadsGameObject.Clear();
     }
 
     public void GenerateRoads()
     {
-        int pointCount = points.Count;
-
-        foreach(Points originPoint in points)
+        foreach (Points originPoints in pointsOnMap)
         {
-            foreach(Points destinationPoint in points)
+            foreach (Points destinationPoints in pointsOnMap)
             {
-                if (originPoint != destinationPoint)
+                if (originPoints != destinationPoints)
                 {
                     Roads newRoads = new Roads();
-                    newRoads.StartingPoint = originPoint;
-                    newRoads.EndingPoint = destinationPoint;
-                    newRoads.Length = CalculateLength(originPoint, destinationPoint);
 
-                    Roads.Add(newRoads);
+                    newRoads.originPoint = originPoints;
+                    newRoads.destinationPoints = destinationPoints;
 
-                    //CreatePhysicalRoad(originPoint, destinationPoint);
+                    roadsList.Add(newRoads);
+                    roadsGameObject.Add(newRoads.GenerateRoad(mapSize));
                 }
             }
         }
     }
 
-    private IEnumerator GenerateShortestPathWithDelay()
+    public void GenerateTournee()
     {
-        List<Points> unvisitedPoints = new List<Points>(points);
-        
-        foreach (Points point in points)
+        Stopwatch stopwatch = new Stopwatch();
+        stopwatch.Start();
+
+        // Assurez-vous que numberOfPoints et numberOftrucks sont correctement initialisés
+        numberOfPoints = pointsOnMap.Count;
+
+        // Créez une liste contenant les indices des points (à l'exception du point d'origine)
+        List<int> pointIndices = new List<int>();
+        for (int i = 1; i < numberOfPoints; i++)
         {
-            if (point.IsStart)
-            {
-                startPoint = point;
-                unvisitedPoints.Remove(startPoint);
-                shortestPath.Clear();
-                shortestPath.Add(startPoint);
-            }
-            else if (point.IsEnd)
-            {
-                endPoint = point;
-                unvisitedPoints.Remove(endPoint);
-            }
+            pointIndices.Add(i);
         }
 
-        while (unvisitedPoints.Count > 0)
-        {
-            float shortestDistance = Mathf.Infinity;
-            Points closestPoint = null;
+        // Mélangez les indices de manière aléatoire
+        Shuffle(pointIndices);
 
-            foreach (Points currentPoint in unvisitedPoints)
+        // Réinitialisez les tournées
+        trucksLists.Clear();
+
+        //Création des camions de la tournée
+        for (int i = 0; i < numberOftrucks; i++)
+        {
+            GameObject gameObject = Instantiate(truckGameObjectPrefab);
+            Trucks newTruck = gameObject.GetComponent<Trucks>();
+            newTruck.truckTourneeIndex = new List<int>();
+            newTruck.id = i;
+
+            newTruck.gameObject.transform.localScale = new Vector3(mapSize, mapSize, mapSize);
+
+            trucksLists.Add(newTruck);
+        }
+
+        int currentTruckIndex = 0;
+        for (int i = 1; i < pointsOnMap.Count; i++)
+        {
+            trucksLists[currentTruckIndex].truckTourneeIndex.Add(pointsOnMap[i].id);
+
+            if (currentTruckIndex + 1 >= numberOftrucks)
             {
-                float distance = CalculateLength(shortestPath[shortestPath.Count - 1], currentPoint);
-                if (distance < shortestDistance)
+                currentTruckIndex = 0;
+            }
+            else
+            {
+                currentTruckIndex++;
+            }
+
+            //Debug.Log($"Taille de la liste de tournée du camion : {trucksLists[currentTruckIndex].truckTourneeIndex.Count}");
+
+            /*truck.truckTourneeIndex.Insert(0, OriginPoint);
+            truck.truckTourneeIndex.Add(OriginPoint);*/
+        }
+
+        stopwatch.Stop();
+        double duration = stopwatch.Elapsed.TotalSeconds;
+
+        TourneeGenerationText.text = "Tour generation duration : " + timeOfAction + " sec";
+    }
+
+    private void Shuffle<T>(List<T> list)
+    {
+        System.Random rng = new System.Random();
+        int n = list.Count;
+        while (n > 1)
+        {
+            n--;
+            int k = rng.Next(n + 1);
+            T value = list[k];
+            list[k] = list[n];
+            list[n] = value;
+        }
+    }
+
+
+    public void GenerateShortestWay()
+    {
+        Stopwatch stopwatch = new Stopwatch();
+        stopwatch.Start();
+
+        recuitSimule.points = pointsOnMap;
+        for (int i = 0; i < numberOftrucks; i++)
+        {
+            List<Transform> bestSolutionPoints = new List<Transform>();
+
+            bestSolutionPoints.Add(pointsOnMap[0].transform);
+
+            List<int> meilleureSolution = recuitSimule.SimulatedAnnealing(trucksLists[i].truckTourneeIndex, recuitSimule.temperature_initiale, recuitSimule.temperature_finale, recuitSimule.max_iterations, recuitSimule.alpha);
+
+            foreach (int index in meilleureSolution)
+            {
+                bestSolutionPoints.Add(pointsOnMap[index].gameObject.transform);
+            }
+
+            trucksLists[i].roads = new List<Roads>();
+
+            for (int k = 0; k < bestSolutionPoints.Count - 1; k++)
+            {
+                Transform originPoint = bestSolutionPoints[k];
+                Transform destinationPoint = bestSolutionPoints[k + 1];
+
+                Roads newRoad = new Roads();
+
+                int index1 = meilleureSolution[k];
+                int index2;
+                if (k + 1 >= bestSolutionPoints.Count - 1)
                 {
-                    shortestDistance = distance;
-                    closestPoint = currentPoint;
+                    index2 = meilleureSolution[0];
                 }
-            }
-            shortestPath.Add(closestPoint);
-            unvisitedPoints.Remove(closestPoint);
-        }
-
-        shortestPath.Add(endPoint);
-
-        for (int i = 0; i < shortestPath.Count - 1; i++)
-        {
-            yield return new WaitForSeconds(1); // Pause d'une seconde
-            CreatePhysicalRoad(shortestPath[i], shortestPath[i + 1], Color.black);
-        }
-    }
-
-    public void ClearMap()
-    {
-        foreach(GameObject gameObject in paths)
-        {
-            Destroy(gameObject);
-            paths.Remove(gameObject);
-        }
-    }
-
-    private float CalculateLength(Points point1, Points point2)
-    {
-        return Vector3.Distance(point1.position, point2.position);
-    }
-
-    private List<Roads> OrderRoads(Points originPoint)
-    {
-        List<Roads> roads = new List<Roads>();
-
-        foreach(Roads road in Roads)
-        {
-            if (road.StartingPoint == originPoint)
-            {
-                roads.Add(road);
-            }
-        }
-
-        RoadComparer comparer = new RoadComparer();
-        roads.Sort(comparer);
-
-        return roads;
-    }
-
-    void CreatePhysicalRoad(Points originPoints, Points endPoint, Color color)
-    {
-        // Créer un cube pour représenter la ligne
-        float cubeLength = Vector3.Distance(originPoints.position, endPoint.position);
-        Vector3 cubeScale = new Vector3(.25f, .1f, cubeLength);
-        Vector3 cubePosition = (originPoints.position + endPoint.position) / 2f;
-        Quaternion cubeRotation = Quaternion.LookRotation(endPoint.position - originPoints.position);
-        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        cube.transform.localScale = cubeScale;
-        cube.transform.position = cubePosition;
-        cube.transform.rotation = cubeRotation;
-
-        cube.name = originPoints.Name + " - " + endPoint.Name;
-
-        // Appliquer la couleur noire au cube
-        Renderer cubeRenderer = cube.GetComponent<Renderer>();
-        cubeRenderer.material.color = color;
-
-        paths.Add(cube);
-
-        //Ajout des roads aux listes
-        if (color == Color.green)
-        {
-            GreenRoads.Add(cube);
-        }
-        else if (color == Color.blue)
-        {
-            BlueRoads.Add(cube);
-        }
-        else if (color == Color.red)
-        {
-            RedRoads.Add(cube);
-        }
-        else if (color == Color.black)
-        {
-            BlackRoads.Add(cube);
-        }
-    }
-    
-    public void FindShortestWay()
-    {
-        ClearMap();
-        foreach(Points point in points)
-        {
-            List<Roads> roads = OrderRoads(point);
-            //Debug.Log(roads.Count);
-
-            if (roads.Count > 0)
-            {
-                for (int i = 0; i < numberOfRoads; i++)
+                else
                 {
-                    Vector3 startPos = roads[i].StartingPoint.position;
-                    Vector3 endPos = roads[i].EndingPoint.position;
-
-                    Color color = Color.white;
-                    if (i == 0)
-                    {
-                        color = Color.green;
-                    }
-                    else if (i == 1)
-                    {
-                        color = Color.blue;
-                    }
-                    else if (i == 2)
-                    {
-                        color = Color.red;
-                    }
-                    else
-                    {
-                        color = Color.black;
-                    }
-
-                    Debug.DrawLine(startPos, endPos, color, 9999);
-
-                    CreatePhysicalRoad(roads[i].StartingPoint, roads[i].EndingPoint, color);
+                    index2 = meilleureSolution[k + 1];
                 }
+
+                newRoad.originPoint = pointsOnMap[index1];
+                newRoad.destinationPoints = pointsOnMap[index2];
+
+                roadsList.Add(newRoad);
+                roadsGameObject.Add(newRoad.GenerateRoad(mapSize));
+
+                trucksLists[i].roads.Add(newRoad);
+            }
+
+            GameObject newTruck = Instantiate(truckPrefab, OriginPoint.gameObject.transform.position, Quaternion.identity);
+
+            Color randomColor = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
+
+            ChangeColorScript colorScript = newTruck.GetComponentInChildren<ChangeColorScript>();
+            colorScript.color = randomColor;
+
+            colorScript.ChangeColor();
+
+            trucksLists[i].speeds = recuitSimule.speeds;
+
+            trucks.Add(newTruck);
+        }
+
+        stopwatch.Stop();
+        double duration = stopwatch.Elapsed.TotalSeconds;
+
+        RecuitSimuleText.text = "Shortest way generation duration " + duration + " sec";
+    }
+
+    public void MoveAllTrucks()
+    {
+        for (int i = 0; i < numberOftrucks; i++)
+        {
+            List<Roads> truckRoads = GetTruckRoads(i);
+            List<GameObject> roads = new List<GameObject>();
+
+            foreach (Roads road in trucksLists[i].roads)
+            {
+                roads.Add(road.roadGameObject);
+            }
+
+            StartCoroutine(MoveTruckAlongRoads(trucksLists[i].roads, trucks[i], trucks[i].GetComponentInChildren<ChangeColorScript>().color, trucksLists[i]));
+        }
+    }
+
+    public List<Roads> GetTruckRoads(int truckIndex)
+    {
+        List<Roads> truckRoads = new List<Roads>();
+
+        foreach (int index in trucksLists[truckIndex].truckTourneeIndex)
+        {
+            if (index < roadsList.Count)
+            {
+                truckRoads.Add(roadsList[index]);
             }
         }
 
-        roadsGenerated = true;
+        return truckRoads;
     }
 
-    #region
-
-    public void DisplayGreenRoads()
+    public IEnumerator MoveTruckAlongRoads(List<Roads> roads, GameObject truck, Color OriginalColor, Trucks truckObject)
     {
-        greenIsDisplay = !greenIsDisplay;
-        
-        foreach(GameObject gameObject in GreenRoads)
+        float movementSpeed = 25f;
+
+        Vector3 initialPosition = truck.transform.position;
+
+        //int index = 0;
+
+        foreach (Roads road in roads)
         {
-            gameObject.SetActive(greenIsDisplay);
+            road.ChangeColor(OriginalColor);
+
+            //movementSpeed = truckObject.speeds[index];
+
+            //UnityEngine.Debug.Log("Vitesse du camion : " + movementSpeed);
+
+            Vector3 originScale = new Vector3(mapSize * 0.01f, mapSize * 0.01f, mapSize * 0.01f);
+            Vector3 newScale = new Vector3(mapSize * 0.03f, mapSize * 0.03f, mapSize * 0.03f);
+            road.originPoint.gameObject.transform.localScale = newScale;
+            road.destinationPoints.gameObject.transform.localScale = newScale;
+
+            float journeyLength = road.Distance;
+            float journeyDuration = journeyLength / movementSpeed;
+            float elapsedTime = 0.0f;
+
+            Vector3 direction = road.destinationPoints.transform.position - road.originPoint.transform.position;
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+            targetRotation *= Quaternion.Euler(0, -90, 0); // Rotation de 90 degrés autour de l'axe Y
+
+            while (elapsedTime < journeyDuration)
+            {
+                float t = elapsedTime / journeyDuration;
+                Vector3 intermediatePosition = Vector3.Lerp(road.originPoint.transform.position, road.destinationPoints.transform.position, t);
+
+                truck.transform.position = intermediatePosition;
+                truck.transform.rotation = Quaternion.Slerp(truck.transform.rotation, targetRotation, t);
+
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+
+            road.originPoint.gameObject.transform.localScale = originScale;
+            road.destinationPoints.gameObject.transform.localScale = originScale;
+
+            truck.transform.position = road.destinationPoints.transform.position;
+            initialPosition = truck.transform.position;
+
+            //index++;
         }
+
+        Destroy(truck);
     }
 
-    public void DisplayBlueRoads()
+
+
+    private void Start()
     {
-        blueIsDisplay = !blueIsDisplay;
+        cam = Camera.main;
 
-        foreach (GameObject gameObject in BlueRoads)
-        {
-            gameObject.SetActive(blueIsDisplay);
-        }
+        //Place cam
+        cam.transform.position = new Vector3(0, mapSize * 2 + mapSize * .2f, 0);
+
+        mapSizeText.text = mapSize.ToString();
+        numberOfPointsText.text = numberOfPoints.ToString();
     }
-
-    public void DisplayRedRoads()
-    {
-        redIsDisplay = !redIsDisplay;
-
-        foreach (GameObject gameObject in RedRoads)
-        {
-            gameObject.SetActive(redIsDisplay);
-        }
-    }
-
-    public void DisplayBlackRoads()
-    {
-        blackIsDisplay = !blackIsDisplay;
-
-        foreach (GameObject gameObject in BlackRoads)
-        {
-            gameObject.SetActive(blackIsDisplay);
-        }
-    }
-
-    #endregion
 }

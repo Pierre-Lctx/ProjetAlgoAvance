@@ -4,11 +4,15 @@ using UnityEngine;
 
 public class Points
 {
-    public Vector3 position;
+    public Transform transform;
     public GameObject gameObject;
 
-    public bool IsStart = false;
-    public bool IsEnd = false;
+    public int id;
 
-    public string Name;
+    public bool isStartAndEnd = false;
+
+    public Points()
+    {
+        
+    }
 }
